@@ -2,7 +2,9 @@ const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
 const { initializeApp, cert } = require('firebase-admin/app');
-const { getStorage, ref, uploadBytes, getDownloadURL } = require('firebase-admin/storage');
+//const { getStorage, ref, uploadBytes, getDownloadURL } = require('firebase-admin/storage');
+const admin = require("firebase-admin");
+
 const { getFirestore, doc, setDoc, getDoc } = require('firebase-admin/firestore');
 
 // Initialize Firebase Admin SDK
@@ -48,11 +50,23 @@ app.post('/upload', upload.single('file'), async (req, res) => {
     }
 
     // Upload file to Firebase Storage
-    const fileRef = ref(storage, `past-questions/${course}-${year}.pdf`);
-    await uploadBytes(fileRef, file.buffer);
+   // const fileRef = ref(storage, `past-questions/${course}-${year}.pdf`);
+   // await uploadBytes(fileRef, file.buffer);
+    const bucket = admin.storage().bucket();
+    const fileRef = bucket.file(`past-questions/${course}-${year}.pdf`);
+
+    // Upload file to Firebase Storage
+   // await fileRef.save(file.buffer, {
+   //   metadata: { contentType: "application/pdf" },
+   // });
+    await fileRef.save(file.buffer, {
+      metadata: { contentType: "application/pdf" },
+    });
 
     // Get download URL
-    const downloadURL = await getDownloadURL(fileRef);
+    //const downloadURL = await getDownloadURL(fileRef);
+      // Generate download URL
+    const downloadURL = `https://storage.googleapis.com/${bucket.name}/past-questions/${course}-${year}.pdf`;
 
     // Save metadata to Firestore
     await setDoc(doc(db, 'past-questions', `${course}-${year}`), {
