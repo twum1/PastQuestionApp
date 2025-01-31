@@ -1,11 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
-const { initializeApp, cert } = require('firebase-admin/app');
-//const { getStorage, ref, uploadBytes, getDownloadURL } = require('firebase-admin/storage');
 const admin = require("firebase-admin");
-
-const { getFirestore, doc, setDoc, getDoc } = require('firebase-admin/firestore');
 
 // Initialize Firebase Admin SDK
 const serviceAccount = {
@@ -25,13 +21,13 @@ const serviceAccount = {
 };
 
 
-initializeApp({
-  credential: cert(serviceAccount),
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
   storageBucket: 'pastquestionapp-b9c52.appspot.com',
 });
 
-const db = getFirestore();
-const storage = getStorage();
+const bucket = admin.storage().bucket();
+const db = admin.firestore();
 
 const app = express();
 app.use(cors());
@@ -49,59 +45,24 @@ app.post('/upload', upload.single('file'), async (req, res) => {
       return res.status(400).send('Missing required fields');
     }
 
-    // Upload file to Firebase Storage
-   // const fileRef = ref(storage, `past-questions/${course}-${year}.pdf`);
-   // await uploadBytes(fileRef, file.buffer);
-    const bucket = admin.storage().bucket();
+    // Reference the file in Firebase Storage
     const fileRef = bucket.file(`past-questions/${course}-${year}.pdf`);
 
-    // Upload file to Firebase Storage
-   // await fileRef.save(file.buffer, {
-   //   metadata: { contentType: "application/pdf" },
-   // });
+    // Upload file
     await fileRef.save(file.buffer, {
       metadata: { contentType: "application/pdf" },
     });
 
-    // Get download URL
-    //const downloadURL = await getDownloadURL(fileRef);
-      // Generate download URL
+    // Generate public URL
     const downloadURL = `https://storage.googleapis.com/${bucket.name}/past-questions/${course}-${year}.pdf`;
 
-    // Save metadata to Firestore
-    await setDoc(doc(db, 'past-questions', `${course}-${year}`), {
-      course,
-      year,
-      downloadURL,
-    });
-
-    res.status(200).send({ downloadURL });
+    res.status(200).json({ message: "File uploaded successfully!", downloadURL });
   } catch (error) {
-    console.error(error);
-    res.status(500).send('Error uploading file');
+    console.error("Upload error:", error);
+    res.status(500).json({ error: "Failed to upload file" });
   }
 });
 
-// Download endpoint
-app.get('/download/:course/:year', async (req, res) => {
-  try {
-    const { course, year } = req.params;
-
-    // Get download URL from Firestore
-    const docRef = doc(db, 'past-questions', `${course}-${year}`);
-    const docSnap = await getDoc(docRef);
-
-    if (!docSnap.exists()) {
-      return res.status(404).send('File not found');
-    }
-
-    const { downloadURL } = docSnap.data();
-    res.redirect(downloadURL);
-  } catch (error) {
-    console.error(error);
-    res.status(500).send('Error downloading file');
-  }
-});
-
-const PORT = process.env.PORT || 5000;
+// Start server
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
